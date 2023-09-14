@@ -47,7 +47,8 @@ class Environment(object):
                  player_controller=None,      # controller object
                  enemy_controller=None,      # controller object
                  use_joystick=False,
-                 visuals=False):
+                 visuals=False,
+                 fitness_func=None):
 
 
         # initializes parameters
@@ -395,7 +396,9 @@ class Environment(object):
 
             # default fitness function for single solutions
     def fitness_single(self):
-        return 0.9*(100 - self.get_enemylife()) + 0.1*self.get_playerlife() - numpy.log(self.get_time())
+        if not self.fitness_func:
+            return 0.8*(100 - self.get_enemylife()) + 0.2*self.get_playerlife() - numpy.log(self.get_time())
+        return self.fitness_func(self.get_enemylife(), self.get_playerlife(), self.get_time())  
 
     # default fitness function for consolidating solutions among multiple games
     def cons_multi(self,values):
