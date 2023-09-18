@@ -1,6 +1,10 @@
 import numpy as np
 from typing import List
 
+CXPB = 0.5
+MUTPB = 0.2
+INPUT_SIZE = 10
+
 class ActivationFunctions:
     def sigmoid_activation(x):
         return 1./(1.+np.exp(-x))
@@ -28,3 +32,14 @@ def norm(x, pfit_pop):
     if x_norm <= 0:
         x_norm = 0.0000000001
     return x_norm
+
+def calculate_ind_size(layer_list: List):
+    last_size = INPUT_SIZE # Input nodes
+    ind_size = 0
+
+    for layer_nodes in layer_list:
+        ind_size +=  (layer_nodes * last_size + layer_nodes)
+        last_size = layer_nodes
+
+    # Output nodes taken into account
+    return ind_size + (5 * last_size) + 5
