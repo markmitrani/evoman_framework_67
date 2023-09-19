@@ -1,4 +1,5 @@
 import os
+import numpy as np
 
 import neat
 import math
@@ -27,10 +28,46 @@ class player_controller(Controller):
     def set(self,controller, n_inputs):
         self.net = controller.net
         pass
+    def remove_unimportant_bulles(self, inputs):
+        bullets = []
+
+        for i in range(8):
+            x = 4 + i * 2
+            y = 4 + i * 2 + 1
+            if inputs[x] == 0.0 and inputs[y] == 0.0:
+                continue
+            bullets.append((inputs[x], inputs[y]))
+        closest_3 = sorted(bullets, key = lambda x: np.sqrt(np.power(x[0], 2) + np.power(x[1], 2)))[:3]
+
+        while len(closest_3) != 3:
+            closest_3.append((0., 0.))
+
+        ans = []
+        for t in closest_3:
+            ans.append(self.normalize_distance(t[0]))
+            ans.append(self.normalize_distance(t[1]))
+        return np.array(ans)
+
+    def normalize_distance(self, d):
+        if d == 0.:
+            return d
+        # 2^-(d/150)^2
+        g_d = np.power(2, -np.power(d/150, 2))
+
+        if d < 0:
+            return -g_d
+        return g_d
+
     def control(self, inputs, controller):
 		# Normalises the input using min-max scaling
         if not self.net:
             return [0]*5
+        inputs = np.concatenate((inputs[:4], self.remove_unimportant_bulles(inputs)), axis=0)
+
+        inputs[0] = self.normalize_distance(inputs[0])
+        inputs[1] = self.normalize_distance(inputs[0])
+
+        inputs = np.array(inputs)
         inputs = (inputs-min(inputs))/float((max(inputs)-min(inputs)))
         output = self.net.activate(inputs)
         output_actions = list(map_to_action(output))
@@ -41,7 +78,6 @@ class player_controller(Controller):
 
 
 # number of weights for multilayer with 10 hidden neurons
-
 
 def simulate(env, cont):
     f,p,e,t = env.play(pcont=cont)
@@ -75,7 +111,7 @@ def run(config_file):
     p.add_reporter(neat.Checkpointer(5))
 
     # Run for up to 300 generations.
-    winner = p.run(eval_genomes, 100)
+    winner = p.run(eval_genomes, 30)
 
     # Display the winning genome.
     print('\nBest genome:\n{!s}'.format(winner))
@@ -116,7 +152,7 @@ if __name__ == '__main__':
     if headless:
         os.environ["SDL_VIDEODRIVER"] = "dummy"
     env = Environment(experiment_name='test',
-                    enemies=[1],
+                    enemies=[2],
                     playermode="ai",
                     player_controller=player_controller(),
                     enemymode="static",
