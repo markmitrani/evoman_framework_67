@@ -5,7 +5,6 @@ def local_search_1(X, i):
         X[i] =np.random.rand()
     return np.array(X)
 
-
 def local_search_2(X, i):
     X_prime = []
     p = np.random.rand()
@@ -34,3 +33,18 @@ def simmulated_annealing(X, toolbox, k_max=100, nn=local_search_2):
             x = new_x
     print(f'Best candidate: {best_opt[1]}')
     return x
+
+def local_optimization(X, func, toolbox, creator):
+    new_X = func(X, toolbox)
+    ind = creator.Individual(new_X)  
+    ind.fitness.values = toolbox.evaluate(ind)
+    if ind.fitness > X.fitness:
+        return ind
+    return X
+
+def local_search_pop(X, func, toolbox, creator gen, pop):
+    X = local_optimization(X, func, toolbox, creator)
+    pop.append(X)
+    pop = sorted(pop, key=lambda x: x.fitness.values[0], reverse=True)
+    pop = pop[:-1]
+    return pop
