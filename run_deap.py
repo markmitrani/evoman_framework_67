@@ -1,13 +1,16 @@
+
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
 import random
 import os
-import scipy
 import numpy as np
 from typing import Dict, List
 
 from deap import base, creator, tools, algorithms
 
 from evoman.environment import Environment
-from deap_constants import CXPB, MUTPB, calculate_ind_size, ActivationFunctions
+from deap_constants import CXPB, MUTPB, calculate_ind_size
 from deap_algorithms import *
 from nn_controller import player_controller
 
@@ -17,13 +20,12 @@ def evaluate(env, individual):
     #env.player_controller.set(individual, 20)
     f,p,e,t = env.play(pcont=individual)
     # Added the +10 because selection algorithms don't work on negative numbers / 0
-    return (f, )
+    return (f+10, )
 
 
 NGEN = 50
-H_NODES_LAYERS = [5]
+H_NODES_LAYERS = [20, 10]
 IND_SIZE = calculate_ind_size(H_NODES_LAYERS)
-LOCAL_OPTIMIZATION = False
 
 headless = False 
 if headless:
@@ -51,9 +53,9 @@ toolbox.register('individual', tools.initRepeat, creator.Individual, toolbox.att
 toolbox.register('population', tools.initRepeat, list, toolbox.individual)
 toolbox.register('evaluate', evaluate, env)
 #toolbox.register("select", tools.selTournament, tournsize=3)
-toolbox.register("mate", tools.cxTwoPoint)
+toolbox.register("mate", tools.cxUniform, indpb=0.2)
 toolbox.register("mutate", tools.mutGaussian, mu=0, sigma=1, indpb=0.2)
-toolbox.register("select", tools.selTournament, tournsize=30)
+toolbox.register("select", tools.selTournament, tournsize=4)
 
 stats = tools.Statistics(key=lambda ind: ind.fitness.values)
 stats.register("avg", np.mean)
@@ -64,8 +66,15 @@ stats.register("max", np.max)
 hof = tools.HallOfFame(maxsize=1)
 winner = None
 
+generation_stats = {
+    'mean': [],
+    'max': []
+}
+gain_stats = {
+    'mean': [],
+    'max': []
+}
 
-    
 def main():
     pop = toolbox.population(n=150)
     # Constants for Mutation / Crossover
@@ -86,27 +95,40 @@ def main():
         # Replacement
         #pop[:] = offspring
         pop = toolbox.select(pop + offspring, len(pop))
-
+ 
         #TODO How to ?
         #env.update_solutions(pop)
         record = stats.compile(pop)
-
-        pop = sorted(pop, key=lambda x: x.fitness.values[0], reverse=True)
-        candidate_winner = pop[0]
-
-
-        if LOCAL_OPTIMIZATION:
-            pop = local_search_pop(candidate_winner, simmulated_annealing, toolbox, creator)
-
+        candidate_winner = pop[np.argmax([i.fitness for i in pop])]
         global winner
         if type(winner) is not creator.Individual:
             winner = candidate_winner
         winner = winner if winner.fitness > candidate_winner.fitness else candidate_winner
+        generation_stats['mean'].append(record['avg'])
+        generation_stats['max'].append(record['max'])
         print(g, record)
 
-main()
+for i in range(10):
+    #main()
+
+    generation_stats['max'] = np.random.normal(100, 1.0, 50)
+    generation_stats['mean'] = np.random.normal(100, 1.0, 50)
+    gain_stats['max'] = np.random.normal(90, 1.0, 50)
+    gain_stats['mean'] = np.random.normal(90, 1.0, 50)
+
+    std_avg_vec = np.array(np.std(gain_stats['mean']))
+    std_max_vec = np.array(np.std(gain_stats['max']))
+
+    avg_vec = np.array(gain_stats['mean'])
+    max_vec = np.array(gain_stats['max'])
+
+
+    break
+
+'''
 env.update_parameter("speed", "normal")
 env.update_parameter("visuals", True)
 env.visuals = True
 env.speed = "normal"
-print(evaluate(env, winner))
+evaluate(env, winner)
+'''

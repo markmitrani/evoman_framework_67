@@ -9,6 +9,10 @@ class ActivationFunctions:
     def sigmoid_activation(x):
         return 1./(1.+np.exp(-x))
 
+    def sigmoid_prime(z, *args):
+        sig = ActivationFunctions.sigmoid_activation(z)
+        return sig * (1 - sig)
+
 def map_to_action(output: List):
 		# takes decisions about sprite actions
         map_o = {
