@@ -2,19 +2,21 @@
 import numpy as np
 from typing import List
 from evoman.controller import Controller
-from tensorflow import keras
-from tensorflow.keras import layers
+import tensorflow.compat.v1 as tf
+#from tensorflow import keras
+#from tensorflow.keras import layers
 from deap_constants import map_to_action, ActivationFunctions
 
+tf.disable_v2_behavior()
 def activation_function_choose():
     return ActivationFunctions.sigmoid_activation
 
 
 class keras_player_controller(Controller):
-    input_layer = layers.Input(10)
-    dense_output = layers.Dense(20, activation='relu')(input_layer)
-    output_layer = layers.Dense(5, activation='linear')(dense_output)
-    model = keras.Model(inputs=input_layer, outputs=output_layer)
+    input_layer = tf.keras.layers.Input(10)
+    dense_output = tf.keras.layers.Dense(20, activation='sigmoid')(input_layer)
+    output_layer = tf.keras.layers.Dense(5)(dense_output)
+    model = tf.keras.Model(inputs=input_layer, outputs=output_layer)
     def __init__(self, n_hidden: List):
         # Set of hidden layer, each item in list
         # is a hidden node
@@ -90,10 +92,9 @@ class keras_player_controller(Controller):
         #
         if not self.n_hidden:
             return [0]*5
+
         inputs = inputs.reshape(1, 10)
-
         model_weights = []
-
         #print(f'weights: {model.get_weights()[1]}')
         for i, w in enumerate(self.weights):
             #print(f' Weights: {np.array(w)}')
@@ -115,6 +116,57 @@ class keras_player_controller(Controller):
         '''
         actions = self.model.predict(x=inputs, verbose=0)
         return list(map_to_action(actions[0]))
+    def optimize_(X, env):
+        last_layer_num = 10
+        last_slice = 0
+        weights = []
+        bias = []
+        for layer_n in 20:
+            # Get slice representing layer_n biases for each node output
+            bias.append(X[last_slice:last_slice+layer_n].reshape(1, layer_n))
+            # Now calcuate the amount of weights from previous layer to next layer for
+            # fully connected topology
+            weights_slice = last_slice + last_layer_num * layer_n + layer_n
+            # Add weights
+            weights.append(X[layer_n+last_slice:weights_slice].reshape(last_layer_num, layer_n))
+
+            # Update variables
+            last_slice = weights_slice
+            last_layer_num = layer_n
+
+
+        # Add weights for output layer from last hidden node layer
+        bias.append(X[last_slice:last_slice+5].reshape(1, 5)) 
+        weights.append(X[last_slice+5:].reshape(last_layer_num, 5))
+
+        inputs = inputs.reshape(1, 10)
+        model_weights = []
+        #print(f'weights: {model.get_weights()[1]}')
+        for i, w in enumerate(weights):
+            #print(f' Weights: {np.array(w)}')
+            #print(f' Bias: {np.array(self.bias[i])[0]}')
+            model_weights.append(np.array(w))
+            model_weights.append(np.array(bias[i])[0])
+
+        opt = tf.keras.optimizers.Adam(learning_rate=0.01)
+        input_layer = tf.keras.layers.Input(10)
+        dense_output = tf.keras.layers.Dense(20, activation='sigmoid')(input_layer)
+        output_layer = tf.keras.layers.Dense(5)(dense_output)
+        model = tf.keras.Model(inputs=input_layer, outputs=output_layer)
+        model.set_weights(model_weights)
+
+        with tf.GradientTape() as tape:
+            logits = model(X)
+            print(logits)
+            #loss_value = loss_fn(env, logits)
+
+        #gradients = tape.gradient(loss_value, model.trainable_weights)
+        #opt.apply_gradients(zip(gradients, model.trainable_weights))
+        
+
+        return model.get_weights().flatten()
+
+
 
 class player_controller(Controller):
     def __init__(self, n_hidden: List):
@@ -166,6 +218,8 @@ class player_controller(Controller):
         for t in closest_3:
             ans.append(self.normalize_distance(t[0]))
             ans.append(self.normalize_distance(t[1]))
+            #ans.append(t[0])
+            #ans.append(t[1])
         return np.array(ans)
 
     def normalize_distance(self, d):
