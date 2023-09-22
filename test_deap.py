@@ -23,6 +23,7 @@ def evaluate(env, individual):
 NGEN = 50
 H_NODES_LAYERS = [5]
 IND_SIZE = calculate_ind_size(H_NODES_LAYERS)
+LOCAL_OPTIMIZATION = False
 
 headless = False 
 if headless:
@@ -64,13 +65,6 @@ hof = tools.HallOfFame(maxsize=1)
 winner = None
 
 
-def local_optimization(X, func):
-    new_X = func(X, toolbox)
-    ind = creator.Individual(new_X)  
-    ind.fitness.values = toolbox.evaluate(ind)
-    if ind.fitness > X.fitness:
-        return ind
-    return X
     
 def main():
     pop = toolbox.population(n=150)
@@ -100,14 +94,9 @@ def main():
         pop = sorted(pop, key=lambda x: x.fitness.values[0], reverse=True)
         candidate_winner = pop[0]
 
-        if g > 50:
-            print(f'Gen Winner: {candidate_winner.fitness.values}')
-            local_optimized = local_optimization(candidate_winner, simmulated_annealing)
-            pop.append(local_optimized)
-            pop = sorted(pop, key=lambda x: x.fitness.values[0], reverse=True)
-            pop = pop[:-1]
 
-            #print(f'local optimized: {local_optimized.fitness.values}') 
+        if LOCAL_OPTIMIZATION:
+            pop = local_search_pop(candidate_winner, simmulated_annealing, toolbox, creator)
 
         global winner
         if type(winner) is not creator.Individual:
