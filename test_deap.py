@@ -11,7 +11,7 @@ from evoman.environment import Environment
 from deap_constants import CXPB, MUTPB, calculate_ind_size
 from deap_algorithms import *
 from nn_controller import player_controller
-from graph import GridGraph, manhattan_distance
+from graph import GridGraph, manhattan_distance, Node
 
 
 def evaluate(env, individual):
@@ -26,7 +26,7 @@ NGEN = 50
 POPULATION_SIZE = 15
 GRID_N_SIZE = 5
 GRID_M_SIZE = 5
-H_NODES_LAYERS = [1]
+H_NODES_LAYERS = [10]
 IND_SIZE = calculate_ind_size(H_NODES_LAYERS)
 MIN_VALUE = -30
 MAX_VALUE = 30
@@ -42,7 +42,7 @@ if not os.path.exists(experiment_name):
     os.makedirs(experiment_name)
 
 env = Environment(experiment_name=experiment_name,
-                  enemies=[2],
+                  enemies=[6],
                   playermode="ai",
                   player_controller=player_controller(H_NODES_LAYERS),
                   enemymode="static",
@@ -92,8 +92,9 @@ toolbox.register('population', tools.initRepeat, list, toolbox.individual)
 
 toolbox.register('evaluate', evaluate, env)
 toolbox.register("mate", tools.cxESTwoPoint)
-toolbox.register("mutate", self_adaptive_correlated_mutation)
-toolbox.register("select", tools.selTournament, tournsize=2)
+toolbox.register('mutate', self_adaptive_correlated_mutation)
+#toolbox.register("mutate", tools.mutESLogNormal, c=0.2, indpb=0.2)
+toolbox.register("select", tools.selTournament, tournsize=4)
 
 #toolbox.decorate("mutate", checkStrategy(MIN_STRATEGY))
 
@@ -110,22 +111,23 @@ def main():
     # Initialize grid graph with populations
     gg = GridGraph(GRID_N_SIZE, GRID_M_SIZE, pop_size=POPULATION_SIZE, toolbox=toolbox)
 
-
-
     gg.update_fitnesses(toolbox)
     for g in range(NGEN):
         # Iterate over each deme
         new_gg: GridGraph = gg.deepcopy()
         for node in gg: 
             
-            node: GridGraph.Node = node
-            clone_node: GridGraph.Node = new_gg[node.get_coords()[0]][node.get_coords()[1]]
+            node: Node = node
+            n_x, n_y = node.get_coords()
+            clone_node: Node = new_gg[n_x][n_y]
             node_pop = node.get_pop()
 
             # Get the population of all the neighbouring nodes
-            neighbour_pop = [n_i.get_pop() for n_i in gg.get_knn(node.get_coords()[0], node.get_coords()[1], manhattan_distance, max_dist=1)]
-            neighbour_pop = list(chain.from_iterable(neighbour_pop))
+            neighbour_pop = gg.get_knn_pop(n_x, n_y, manhattan_distance, max_dist=2)
+            #print(neighbour_pop)
+            neighbour_pop = toolbox.select(neighbour_pop, len(neighbour_pop))
 
+            new_node_pop = []
             for ind_idx, ind in enumerate(node_pop):
                 offspring = toolbox.clone(ind)
                 change_ocurred = False
@@ -139,7 +141,7 @@ def main():
 
                     offspring_1, offspring_2 = toolbox.mate(offspring, partner)
 
-                    offspring = random.choice([offspring_1, offspring_2])
+                    offspring = tools.selBest([offspring_1, offspring_2], k=2)[0]
 
                     del offspring.fitness.values
 
@@ -149,18 +151,23 @@ def main():
                     offspring = toolbox.mutate(offspring)
                     del offspring.fitness.values
 
+                #print(len(ind))
+                #new_node_pop.append(toolbox.clone(ind))
+
                 if not change_ocurred:
+                    new_node_pop.append(offspring)
                     continue
                 
                 offspring.fitness.values = toolbox.evaluate(offspring)
 
                 # Replacement
                 if offspring.fitness.values[0] >= ind.fitness.values[0]:
-                    clone_node[ind_idx] = offspring
+                    new_node_pop.append(offspring)
+                    #clone_node[ind_idx] = offspring
                 else:
-                    assert(offspring != ind)
-                    clone_node[ind_idx] = ind
-            
+                    new_node_pop.append(toolbox.clone(ind))
+                    #clone_node[ind_idx] = ind
+            clone_node.set_pop(new_node_pop)
 
             #record = stats.compile(clone_node.get_popu())
             #print(f'gen: {g}, node: {node}, record: {record}')
@@ -171,9 +178,11 @@ def main():
         allpop = gg.allpop()
         record = stats.compile(allpop)
         candidate_winner = allpop[np.argmax([i.fitness.values[0] for i in allpop])]
+
         global winner
         if type(winner) is not creator.Individual:
             winner = candidate_winner
+
         winner = winner if winner.fitness > candidate_winner.fitness else candidate_winner
         print(candidate_winner.fitness)
         print(f'gen: {g}, record: {record}')
@@ -194,4 +203,4 @@ env.update_parameter("speed", "normal")
 env.update_parameter("visuals", True)
 env.visuals = True
 env.speed = "normal"
-evaluate(env, winner)
+print(f'gain: {evaluate(env, winner)[1]}')
