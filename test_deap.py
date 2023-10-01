@@ -14,12 +14,27 @@ from nn_controller import player_controller
 from graph import GridGraph, manhattan_distance, Node
 
 
-def evaluate(env, individual):
+last_W = 1
+
+def W(t, F, beta_1=0.5, beta_2=0.5,):
+    global last_W
+    if t == 0:
+        return last_W
+    if F:
+        last_W = 1/beta_1 * last_W
+    else:
+        last_W = beta_2*last_W
+    return last_W
+    
+
+def evaluate(env, individual, t=0, F=False):
     #c = player_controller(H_NODES_LAYERS)
     #env.player_controller.set(individual, 20)
     f,p,e,t = env.play(pcont=individual)
     # Added the +10 because selection algorithms don't work on negative numbers / 0
     return (f, )
+    penalty = int(e != 0)
+    return (f-W(t, F)*penalty, )
 
 
 NGEN = 50
@@ -42,7 +57,7 @@ if not os.path.exists(experiment_name):
     os.makedirs(experiment_name)
 
 env = Environment(experiment_name=experiment_name,
-                  enemies=[6],
+                  enemies=[3],
                   playermode="ai",
                   player_controller=player_controller(H_NODES_LAYERS),
                   enemymode="static",
@@ -51,9 +66,10 @@ env = Environment(experiment_name=experiment_name,
                   visuals=False)
 
 
+N_gaus = random.gauss(0,1)
 def self_adaptive_correlated_mutation(ind):
     for i in range(len(ind.strategy)):
-        ind.strategy[i] *= np.exp(random.gauss(0, 1))
+        ind.strategy[i] *= np.exp(N_gaus - random.gauss(0, 1))
 
     for i in range(len(ind.strategy)):
         ind[i] += random.gauss(0, ind.strategy[i])
@@ -105,6 +121,7 @@ stats.register("min", np.min)
 stats.register("max", np.max)
 
 hof = tools.HallOfFame(maxsize=1)
+global winner
 winner = None
 
 def main():
@@ -158,7 +175,9 @@ def main():
                     new_node_pop.append(offspring)
                     continue
                 
-                offspring.fitness.values = toolbox.evaluate(offspring)
+                global winner
+                F = False if not winner else env.play(pcont=winner)[2]== 0
+                offspring.fitness.values = toolbox.evaluate(offspring, t=g, F=F)
 
                 # Replacement
                 if offspring.fitness.values[0] >= ind.fitness.values[0]:
@@ -179,7 +198,6 @@ def main():
         record = stats.compile(allpop)
         candidate_winner = allpop[np.argmax([i.fitness.values[0] for i in allpop])]
 
-        global winner
         if type(winner) is not creator.Individual:
             winner = candidate_winner
 
@@ -203,4 +221,4 @@ env.update_parameter("speed", "normal")
 env.update_parameter("visuals", True)
 env.visuals = True
 env.speed = "normal"
-print(f'gain: {evaluate(env, winner)[1]}')
+print(f'gain: {env.play(pcont=winner)[1]}')

@@ -1,4 +1,5 @@
 import numpy as np
+from scipy.special import softmax
 from typing import List
 
 CXPB = 0.5
@@ -8,6 +9,8 @@ INPUT_SIZE = 10
 class ActivationFunctions:
     def sigmoid_activation(x):
         return 1./(1.+np.exp(-x))
+    def softmax_activation(x):
+        return softmax(x)
 
 def map_to_action(output: List):
 		# takes decisions about sprite actions

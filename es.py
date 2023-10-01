@@ -276,8 +276,12 @@ class ES:
             yield record
 
     def run_cycle(self):
+        
+        
+
+        parents = self.toolbox.select(self.pop, len(self.pop))
         # Crossover and Mutation
-        offspring = algorithms.varAnd(self.pop, self.toolbox, CXPB, MUTPB)
+        offspring = algorithms.varAnd(parents, self.toolbox, CXPB, MUTPB)
 
         # Evaluate fitness
         invalid_ind = [ind for ind in offspring if not ind.fitness.valid]
