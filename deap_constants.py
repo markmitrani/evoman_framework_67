@@ -12,6 +12,10 @@ class ActivationFunctions:
     def softmax_activation(x):
         return softmax(x)
 
+    def sigmoid_prime(z, *args):
+        sig = ActivationFunctions.sigmoid_activation(z)
+        return sig * (1 - sig)
+
 def map_to_action(output: List):
 		# takes decisions about sprite actions
         map_o = {

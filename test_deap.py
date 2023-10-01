@@ -1,5 +1,6 @@
 import random
 import os
+import scipy
 import numpy as np
 import array
 from typing import Dict, List
@@ -8,7 +9,7 @@ from itertools import chain
 from deap import base, creator, tools, algorithms
 
 from evoman.environment import Environment
-from deap_constants import CXPB, MUTPB, calculate_ind_size
+from deap_constants import CXPB, MUTPB, calculate_ind_size, ActivationFunctions
 from deap_algorithms import *
 from nn_controller import player_controller
 from graph import GridGraph, manhattan_distance, Node
@@ -47,6 +48,7 @@ MIN_VALUE = -30
 MAX_VALUE = 30
 MIN_STRATEGY = -1
 MAX_STRATEGY = 1
+
 
 headless = False
 if headless:
@@ -124,6 +126,8 @@ hof = tools.HallOfFame(maxsize=1)
 global winner
 winner = None
 
+
+    
 def main():
     # Initialize grid graph with populations
     gg = GridGraph(GRID_N_SIZE, GRID_M_SIZE, pop_size=POPULATION_SIZE, toolbox=toolbox)
