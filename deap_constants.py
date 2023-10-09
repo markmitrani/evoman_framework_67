@@ -2,8 +2,8 @@ import numpy as np
 from scipy.special import softmax
 from typing import List
 
-CXPB = 0.5
-MUTPB = 0.2
+CXPB = [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]
+MUTPB = [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]
 INPUT_SIZE = 10
 
 class ActivationFunctions:

@@ -35,7 +35,7 @@ def checkStrategy(minstrategy):
 
 NGEN = 50
 POPULATION_SIZE_GRID = 15
-POPULATION_SIZE = 375
+POPULATION_SIZE = [150, 200, 250, 300, 350]
 GRID_N_SIZE = 5
 GRID_M_SIZE = 5
 H_NODES_LAYERS = [10]
@@ -114,7 +114,7 @@ class CellularES:
         f,p,e,t = self.env.play(pcont=individual)
         # Added the +10 because selection algorithms don't work on negative numbers / 0
         return (f, )
-        
+
     def run_n(self):
         for g in range(NGEN):
             record = self.run_cycle()
@@ -125,8 +125,8 @@ class CellularES:
 
     def run_cycle(self):
         new_gg: GridGraph = self.gg.deepcopy()
-        for node in self.gg: 
-            
+        for node in self.gg:
+
             node: Node = node
             n_x, n_y = node.get_coords()
             clone_node: Node = new_gg[n_x][n_y]
@@ -266,8 +266,9 @@ class ES:
         f,p,e,t = self.env.play(pcont=individual)
         # Added the +10 because selection algorithms don't work on negative numbers / 0
         return (f, )
-        
+
     def run_n(self):
+        
         for g in range(NGEN):
             record = self.run_cycle()
             if g == 400:
@@ -276,8 +277,8 @@ class ES:
             yield record
 
     def run_cycle(self):
-        
-        
+
+
 
         parents = self.toolbox.select(self.pop, len(self.pop))
         # Crossover and Mutation
@@ -303,8 +304,3 @@ class ES:
             self.winner = candidate_winner
         self.winner = self.winner if self.winner.fitness > candidate_winner.fitness else candidate_winner
         return record
-
-
-
-
-
