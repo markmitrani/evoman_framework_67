@@ -20,6 +20,7 @@ class player_controller(Controller):
 	def set(self,controller, n_inputs):
 		# Number of hidden neurons
 
+		controller = np.array(controller)
 		if self.n_hidden[0] > 0:
 			# Preparing the weights and biases from the controller of layer 1
 

@@ -6,12 +6,13 @@ import array
 from typing import Any, Dict, List
 from itertools import chain
 
-from deap import base, creator, tools, algorithms
+from deap import base, creator, tools, algorithms, cma
 
 from evoman.environment import Environment
-from deap_constants import CXPB, MUTPB, calculate_ind_size
+from deap_constants import *
 from deap_algorithms import *
-from nn_controller import player_controller
+#from nn_controller import player_controller
+from demo_controller import player_controller
 from graph import GridGraph, manhattan_distance, Node
 
 headless = True
@@ -33,64 +34,112 @@ def checkStrategy(minstrategy):
         return wrappper
     return decorator
 
-NGEN = 50
-POPULATION_SIZE_GRID = 15
-POPULATION_SIZE = 375
-GRID_N_SIZE = 5
-GRID_M_SIZE = 5
-H_NODES_LAYERS = [10]
-IND_SIZE = calculate_ind_size(H_NODES_LAYERS)
-MIN_VALUE = -30
-MAX_VALUE = 30
-MIN_STRATEGY = -1
-MAX_STRATEGY = 1
 
-class CellularES:
-    def __init__(self, enemy):
+class EA:
+    def __init__(self, enemy, multimode=False, **kwargs):
         self.enemy=enemy
         self.env = None
         self.toolbox = base.Toolbox()
         self.generation = 0
-        self.winner = None
+        self.kwargs=kwargs
         self.init_DEAP()
-        self.init_EVOMAN()
+        self.init_logging()
+        multimode_str = 'yes' if multimode else 'no'
+        self.init_EVOMAN(multimode=multimode_str)
+
+    def init_logging(self):
+        self.hof = tools.HallOfFame(1)
+        self.stats = tools.Statistics(key=lambda ind: ind.fitness.values)
+        self.stats.register("avg", np.mean)
+        self.stats.register("std", np.std)
+        self.stats.register("min", np.min)
+        self.stats.register("max", np.max)
+
+    def evaluate(self, individual):
+        f,p,e,t,d = self.env.play(pcont=individual)
+        return (f, )
+
+    def get_gen(self):
+        return self.generation
+
+    def init_DEAP():
+        pass
+
+    def feasible(self, individual):
+        f, p, e, t,d = self.env.play(pcont=individual) 
+        return e == 0
+
+    def distance(self, individual):
+        f, p, e, t, d = self.env.play(pcont=individual)
+        return e
+
+    def init_EVOMAN(self, multimode):
+        if headless:
+            os.environ["SDL_VIDEODRIVER"] = "dummy"
+        experiment_name='cellular__es'
+        if not os.path.exists(experiment_name):
+            os.makedirs(experiment_name)
+        if type(self.enemy) == int:
+            self.enemy = [self.enemy]
+        self.env = Environment(experiment_name=experiment_name,
+                    enemies=self.enemy,
+                    multiplemode=multimode,
+                    playermode="ai",
+                    player_controller=player_controller(H_NODES_LAYERS[0]),
+                    enemymode="static",
+                    level=2,
+                    speed="fastest",
+                    visuals=False)
+        self.toolbox.register('evaluate', self.evaluate)
+        #self.toolbox.decorate("evaluate", tools.DeltaPenality(self.feasible, 5, self.distance))
+
+
+    def run_n(self):
+        for g in range(self.kwargs.get('NGEN', NGEN)):
+            record = self.run_cycle()
+            if g:
+                print(f'gen: {g}, record: {record}')
+            self.generation = g
+            yield record
+
+    def get_best(self):
+        return self.hof[0]
+
+    def run_cycle(self):
+        pass
+    def __repr__(self) -> str:
+        return 'EA'
+    def __str__(self):
+        return 'EA'
+
+    def extinction(self, percent=0.5):
+        self.pop = sorted(self.pop, reverse=True)[:len(self.pop)*percent]
+
+
+class CellularES(EA):
+    def __init__(self, enemy, multimode=False, **kwargs):
+        super().__init__(enemy, multimode, kwargs)
+        GRID_N_SIZE = self.kwargs.get('GRID_N_SIZE', GRID_N_SIZE)
+        GRID_M_SIZE = self.kwargs.get('GRID_M_SIZE', GRID_M_SIZE)
+        POPULATION_SIZE_GRID = self.kwargs.get('POPULATION_SIZE_GRID', POPULATION_SIZE_GRID)
+        self.gg = GridGraph(GRID_N_SIZE, GRID_M_SIZE, pop_size=POPULATION_SIZE_GRID, toolbox=self.toolbox)
+        self.gg.update_fitnesses(self.toolbox)
 
     def __repr__(self) -> str:
         return 'Cellular-ES'
     def __str__(self):
         return 'Cellular-ES'
 
-    def get_gen(self):
-        return self.generation
-
-    def get_best(self):
-        return self.winner
-
-    def init_EVOMAN(self):
-        if headless:
-            os.environ["SDL_VIDEODRIVER"] = "dummy"
-        experiment_name='cellular__es'
-        if not os.path.exists(experiment_name):
-            os.makedirs(experiment_name)
-        self.env = Environment(experiment_name=experiment_name,
-                    enemies=[self.enemy],
-                    playermode="ai",
-                    player_controller=player_controller(H_NODES_LAYERS),
-                    enemymode="static",
-                    level=2,
-                    speed="fastest",
-                    visuals=False)
-        self.toolbox.register('evaluate', self.evaluate)
-        # Initialize grid graph with populations
-        self.gg = GridGraph(GRID_N_SIZE, GRID_M_SIZE, pop_size=POPULATION_SIZE_GRID, toolbox=self.toolbox)
-
-        self.gg.update_fitnesses(self.toolbox)
-
     def init_DEAP(self):
         creator.create('FitnessMax', base.Fitness, weights=(1.0,))
         creator.create('Individual', array.array, fitness=creator.FitnessMax, strategy=None, typecode='d')
         creator.create('Strategy', array.array, typecode='d')
 
+        MIN_VALUE = self.kwargs.get('MIN_VALUE', MIN_VALUE)
+        MAX_VALUE = self.kwargs.get('MAX_VALUE', MAX_VALUE)
+        MIN_STRATEGY = self.kwargs.get('MIN_STRATEGY', MIN_STRATEGY)
+        MAX_STRATEGY = self.kwargs.get('MAX_STRATEGY', MAX_STRATEGY)
+        TOUR_SIZE = self.kwargs.get('TOUR_SIZE', TOUR_SIZE)
         self.toolbox.register('attr_float', random.random)
         self.toolbox.register("individual", generateES, creator.Individual, creator.Strategy,
             IND_SIZE, MIN_VALUE, MAX_VALUE, MIN_STRATEGY, MAX_STRATEGY)
@@ -99,29 +148,7 @@ class CellularES:
         self.toolbox.register("mate", tools.cxESTwoPoint)
         self.toolbox.register('mutate', self_adaptive_correlated_mutation)
         #toolbox.register("mutate", tools.mutESLogNormal, c=0.2, indpb=0.2)
-        self.toolbox.register("select", tools.selTournament, tournsize=4)
-
-
-        self.stats = tools.Statistics(key=lambda ind: ind.fitness.values)
-        self.stats.register("avg", np.mean)
-        self.stats.register("std", np.std)
-        self.stats.register("min", np.min)
-        self.stats.register("max", np.max)
-
-    def evaluate(self, individual):
-        #c = player_controller(H_NODES_LAYERS)
-        #env.player_controller.set(individual, 20)
-        f,p,e,t = self.env.play(pcont=individual)
-        # Added the +10 because selection algorithms don't work on negative numbers / 0
-        return (f, )
-        
-    def run_n(self):
-        for g in range(NGEN):
-            record = self.run_cycle()
-            if g == 400:
-                print(f'gen: {g}, record: {record}')
-            self.generation = g
-            yield record
+        self.toolbox.register("select", tools.selTournament, tournsize=TOUR_SIZE)
 
     def run_cycle(self):
         new_gg: GridGraph = self.gg.deepcopy()
@@ -184,23 +211,19 @@ class CellularES:
         self.gg = new_gg
         allpop = self.gg.allpop()
         record = self.stats.compile(allpop)
-        candidate_winner = allpop[np.argmax([i.fitness.values[0] for i in allpop])]
+        self.hof.update(allpop)
 
-        if type(self.winner) is not creator.Individual:
-            self.winner = candidate_winner
-
-        self.winner = self.winner if self.winner.fitness > candidate_winner.fitness else candidate_winner
         return record
 
-class ES:
-    def __init__(self, enemy):
-        self.enemy=enemy
-        self.env = None
-        self.toolbox = base.Toolbox()
-        self.generation = 0
-        self.winner = None
-        self.init_DEAP()
-        self.init_EVOMAN()
+class ES(EA):
+    def __init__(self, enemy, multimode=False, **kwargs):
+        super().__init__(enemy, multimode, **kwargs)
+        population_size = self.kwargs.get('POPULATION_SIZE', POPULATION_SIZE)
+        self.pop = self.toolbox.population(population_size)
+        # Constants for Mutation / Crossover
+        fitnesses = map(self.toolbox.evaluate, self.pop)
+        for ind, fit in zip(self.pop, fitnesses):
+            ind.fitness.values = fit
 
     def __repr__(self) -> str:
         return 'ES'
@@ -208,80 +231,34 @@ class ES:
     def __str__(self) -> str:
         return 'ES'
 
-    def get_gen(self):
-        return self.generation
-
-    def get_best(self):
-        return self.winner
-
-    def init_EVOMAN(self):
-        headless = False
-        if headless:
-            os.environ["SDL_VIDEODRIVER"] = "dummy"
-        experiment_name='cellular__es'
-        if not os.path.exists(experiment_name):
-            os.makedirs(experiment_name)
-        self.env = Environment(experiment_name=experiment_name,
-                    enemies=[self.enemy],
-                    playermode="ai",
-                    player_controller=player_controller(H_NODES_LAYERS),
-                    enemymode="static",
-                    level=2,
-                    speed="fastest",
-                    visuals=False)
-        self.toolbox.register('evaluate', self.evaluate)
-        self.pop = self.toolbox.population(POPULATION_SIZE)
-
-        # Constants for Mutation / Crossover
-        fitnesses = map(self.toolbox.evaluate, self.pop)
-        for ind, fit in zip(self.pop, fitnesses):
-            ind.fitness.values = fit
-
-
     def init_DEAP(self):
         creator.create('FitnessMax', base.Fitness, weights=(1.0,))
         creator.create('Individual', array.array, fitness=creator.FitnessMax, strategy=None, typecode='d')
         creator.create('Strategy', array.array, typecode='d')
 
+        min_value = self.kwargs.get('MIN_VALUE', MIN_VALUE)
+        max_value = self.kwargs.get('MAX_VALUE', MAX_VALUE)
+        min_strategy = self.kwargs.get('MIN_STRATEGY', MIN_STRATEGY)
+        max_strategy = self.kwargs.get('MAX_STRATEGY', MAX_STRATEGY)
+        tour_size = self.kwargs.get('TOUR_SIZE', TOUR_SIZE)
+
         self.toolbox.register('attr_float', random.random)
         self.toolbox.register("individual", generateES, creator.Individual, creator.Strategy,
-            IND_SIZE, MIN_VALUE, MAX_VALUE, MIN_STRATEGY, MAX_STRATEGY)
+            IND_SIZE, min_value, max_value, min_strategy, max_strategy)
         self.toolbox.register('population', tools.initRepeat, list, self.toolbox.individual)
 
         self.toolbox.register("mate", tools.cxESTwoPoint)
         self.toolbox.register('mutate', self_adaptive_correlated_mutation)
         #toolbox.register("mutate", tools.mutESLogNormal, c=0.2, indpb=0.2)
-        self.toolbox.register("select", tools.selTournament, tournsize=4)
-
-
-        self.stats = tools.Statistics(key=lambda ind: ind.fitness.values)
-        self.stats.register("avg", np.mean)
-        self.stats.register("std", np.std)
-        self.stats.register("min", np.min)
-        self.stats.register("max", np.max)
-
-    def evaluate(self, individual):
-        #c = player_controller(H_NODES_LAYERS)
-        #env.player_controller.set(individual, 20)
-        f,p,e,t = self.env.play(pcont=individual)
-        # Added the +10 because selection algorithms don't work on negative numbers / 0
-        return (f, )
-        
-    def run_n(self):
-        for g in range(NGEN):
-            record = self.run_cycle()
-            if g == 400:
-                print(f'gen: {g}, record: {record}')
-            self.generation = g
-            yield record
+        self.toolbox.register("select", tools.selTournament, tournsize=tour_size)
 
     def run_cycle(self):
-        
-        
-
         parents = self.toolbox.select(self.pop, len(self.pop))
+        cxpb = self.kwargs.get('CXPB', CXPB)
+        mutpb = self.kwargs.get('MUTPB', MUTPB)
+
         # Crossover and Mutation
-        offspring = algorithms.varAnd(parents, self.toolbox, CXPB, MUTPB)
+        offspring = algorithms.varAnd(parents, self.toolbox, cxpb, mutpb)
 
         # Evaluate fitness
         invalid_ind = [ind for ind in offspring if not ind.fitness.valid]
@@ -290,21 +267,53 @@ class ES:
             ind.fitness.values = fit
 
         # Replacement
-        #pop[:] = offspring
+        #self.pop[:] = offspring
         self.pop = self.toolbox.select(self.pop + offspring, len(self.pop))
 
-        #TODO How to ?
-        # TODO Update mutation parameters here
-
-        #env.update_solutions(pop)
+        self.hof.update(self.pop)
         record = self.stats.compile(self.pop)
-        candidate_winner = self.pop[np.argmax([i.fitness for i in self.pop])]
-        if type(self.winner) is not creator.Individual:
-            self.winner = candidate_winner
-        self.winner = self.winner if self.winner.fitness > candidate_winner.fitness else candidate_winner
+
         return record
 
+class CMA(EA):
+    def __init__(self, enemy, multimode=False):
+        super().__init__(enemy, multimode)
+        
 
+    def __repr__(self) -> str:
+        return 'CMA-ES'
 
+    def __str__(self) -> str:
+        return 'CMA-ES'
 
+    def init_DEAP(self):
+        creator.create('FitnessMin', base.Fitness, weights=(-1.0,))
+        creator.create('Individual', array.array, fitness=creator.FitnessMin, typecode='d')
 
+        MIN_VALUE = self.kwargs.get('MIN_VALUE', MIN_VALUE)
+        MAX_VALUE = self.kwargs.get('MAX_VALUE', MAX_VALUE)
+        MIN_STRATEGY = self.kwargs.get('MIN_STRATEGY', MIN_STRATEGY)
+        MAX_STRATEGY = self.kwargs.get('MAX_STRATEGY', MAX_STRATEGY)
+        TOUR_SIZE = self.kwargs.get('TOUR_SIZE', TOUR_SIZE)
+
+        strategy = cma.Strategy(centroid=np.random.uniform(MIN_VALUE, MAX_VALUE, IND_SIZE), \
+                                sigma=np.random.uniform(MIN_STRATEGY, MAX_STRATEGY),\
+                                lambda_=2*IND_SIZE)
+        self.toolbox.register("generate", strategy.generate, creator.Individual)
+        self.toolbox.register("update", strategy.update)
+
+    def evaluate(self, individual):
+        f,p,e,t,d = self.env.play(pcont=individual)
+        return (-f, )
+
+    def run_cycle(self):
+        pop = self.toolbox.generate()
+        fitnesses = [self.toolbox.evaluate(individual=ind) for ind in pop]
+        for ind, fit in zip(pop, fitnesses):
+            ind.fitness.values = fit
+        self.hof.update(pop)
+        record = self.stats.compile(pop)
+
+        self.toolbox.update(pop)
+
+        return record
