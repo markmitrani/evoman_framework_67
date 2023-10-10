@@ -2,9 +2,8 @@ import numpy as np
 from scipy.special import softmax
 from typing import List
 
-CXPB = 0.5
-MUTPB = 0.2
-INPUT_SIZE = 10
+
+INPUT_SIZE = 20
 
 class ActivationFunctions:
     def sigmoid_activation(x):
@@ -50,3 +49,25 @@ def calculate_ind_size(layer_list: List):
 
     # Output nodes taken into account
     return ind_size + (5 * last_size) + 5
+
+
+#  General Params
+NGEN = 30
+POPULATION_SIZE_GRID = 15
+POPULATION_SIZE = 150
+GRID_N_SIZE = 5
+GRID_M_SIZE = 5
+H_NODES_LAYERS = [10]
+IND_SIZE = calculate_ind_size(H_NODES_LAYERS)
+MIN_VALUE = -30
+MAX_VALUE = 30
+MIN_STRATEGY = -10
+MAX_STRATEGY = 10
+TOUR_SIZE = 4
+
+# DEAP Params
+ALPHA = 0.7
+C = 0.2
+INDPB = 0.7
+CXPB = 0.5
+MUTPB = 0.7
