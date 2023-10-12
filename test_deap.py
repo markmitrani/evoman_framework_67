@@ -1,4 +1,5 @@
 import random
+from cProfile import Profile
 import math
 import operator
 import os
@@ -223,16 +224,16 @@ def updateParticle(part, best, w, phi1, phi2):
     part[:] = (np.array(part)  + np.array(part.speed)).tolist()
 
 def run_pso_opt(trial):
-    ngen = 300
-    population_size = trial.suggest_int('POPULATION_SIZE', 10, 375)
-    min_value = trial.suggest_float('MIN_VALUE', -1, 0)
-    max_value = trial.suggest_float('MAX_VALUE', 0, 1)
-    smin_value = trial.suggest_float('SMIN_VALUE', -1, 0)
-    smax_value = trial.suggest_float('SMAX_VALUE', 0, 1)
+    ngen = 200
+    population_size = 250
+    min_value = -1#trial.suggest_float('MIN_VALUE', -1, 0)
+    max_value = 1# trial.suggest_float('MAX_VALUE', 0, 1)
+    smin_value = -1# trial.suggest_float('SMIN_VALUE', -1, 0)
+    smax_value = 1 #trial.suggest_float('SMAX_VALUE', 0, 1)
 
     # DEAP Params
-    phi_1 = trial.suggest_float('PHI_1', 0.0, 5)
-    phi_2 = trial.suggest_float('PHI_2', 0.0, 5)
+    phi_1 = trial.suggest_float('PHI_1', 0.0, 3)
+    phi_2 = trial.suggest_float('PHI_2', 0.0, 3)
 
     print('\n')
     print(min_value, max_value, smin_value, smax_value, phi_1, phi_2)
@@ -290,7 +291,7 @@ def run_pso_opt(trial):
             toolbox.update(part, best, w)
         w -= w_dec
         if len(best.defeated) >= 6:
-            np.savetxt(f'good_weights/pso_opt_12345678_{best.gain}_{best.defeated}.txt')
+            np.savetxt(f'good_weights/pso_opt_12345678_{best.gain}_{best.defeated}.txt', X=list(best))
         print(g, best.fitness, best.gain, best.defeated)
 
         # Gather all the fitnesses in one list and print the stats
@@ -320,3 +321,4 @@ def main_PSO():
 #main()
 #main_es()
 main_PSO()
+
