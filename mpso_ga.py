@@ -233,7 +233,7 @@ def run_exp(trial):
             filename = f'good_weights/mpsoga_12345678_{hof[0].gain}_{hof[0].defeated}.txt'
             np.savetxt(filename, X=list(hof[0]))
         stats.compile(ga_pop)
-        print(stats)
+        print(ga_g, stats)
 
     # Play the best controller found
     env.enemies = [i for i in range(1, 9)]
