@@ -100,6 +100,8 @@ def pso_pop(pop, w, w_dec, num_swarms):
     global_best = None
     particles_per_swarm = pswarm_population // num_swarms
 
+    last_best = 0.0
+    last_best_times = 0.0
     cnt = 0
     swarms = []
     for _ in range(num_swarms):
@@ -137,12 +139,6 @@ def pso_pop(pop, w, w_dec, num_swarms):
 
             w -= w_dec
 
-            if len(global_best.defeated) >= 7:
-                filename = f'good_weights/mpsoga_12345678_{global_best.gain}_{global_best.defeated}.txt'
-                np.savetxt(filename)
-                print(f'Saved weights to {filename}')
-
-            print(f'Swarm {swarms.index(swarm)}, Generation {g}: Best Fitness: {global_best.fitness}, Gain: {global_best.gain}, Defeated: {global_best.defeated}')
 
             # Add communication between swarms by allowing some particles to migrate
             if len(swarms) > 1:
@@ -155,7 +151,15 @@ def pso_pop(pop, w, w_dec, num_swarms):
                             target_swarm = left_swarm if np.random.choice([True, False]) else right_swarm
                             target_part = target_swarm[np.random.choice([i for i in range(len(target_swarm))])]
                             part[:] = target_part[:]
-        if g % 50 == 0:
+
+        if len(global_best.defeated) >= 7:
+            filename = f'good_weights/mpsoga_12345678_{global_best.gain}_{global_best.defeated}.txt'
+            np.savetxt(filename, X=list(global_best))
+
+        if global_best.fitness.values[0] == last_best:
+            last_best_times += 1
+        if last_best_times == 5:
+            last_best_times = 0
             for swarm in swarms:
                 for part in swarm:
                     if np.random.rand() < 0.3:
