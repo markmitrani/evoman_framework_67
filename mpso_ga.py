@@ -12,7 +12,7 @@ from deap import base, creator, tools, algorithms, cma
 
 
 pswarm_population = 250
-pswarm_ngen = 50
+pswarm_ngen = 20
 ga_population = 250
 ga_ngen = 200
 
@@ -152,6 +152,7 @@ def pso_pop(pop, w, w_dec, num_swarms):
                             target_part = target_swarm[np.random.choice([i for i in range(len(target_swarm))])]
                             part[:] = target_part[:]
 
+        print(g, global_best.fitness, global_best.gain, global_best.defeated)
         if len(global_best.defeated) >= 7:
             filename = f'good_weights/mpsoga_12345678_{global_best.gain}_{global_best.defeated}.txt'
             np.savetxt(filename, X=list(global_best))
