@@ -240,6 +240,7 @@ def run_exp(trial):
     env.enemies = [i for i in range(1, 9)]
     f, p, e, t, defeated = env.play(pcont=hof[0])
     print(f'f, gain, defeated: {f, p-e, defeated}')
+    return len(p-e)
 
 def main():
     study = optuna.create_study(
