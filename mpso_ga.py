@@ -25,6 +25,11 @@ smax_value = 0.5
 
 # GA params
 
+def log(text):
+    with open('logger.txt', 'a') as f:
+        f.write(text)
+
+
 def generate(size, pmin, pmax, smin, smax, gain, defeated, b_in_swarm, x=[]):
     if not x:
         part = creator.Particle(np.random.uniform(pmin, pmax) for _ in range(size))
@@ -152,7 +157,7 @@ def pso_pop(pop, w, w_dec, num_swarms):
                             target_part = target_swarm[np.random.choice([i for i in range(len(target_swarm))])]
                             part[:] = target_part[:]
 
-        print(g, global_best.fitness, global_best.gain, global_best.defeated)
+        log(f'gen, fit, gain, defeated: {g, global_best.fitness, global_best.gain, global_best.defeated}')
         if len(global_best.defeated) >= 7:
             filename = f'good_weights/mpsoga_12345678_{global_best.gain}_{global_best.defeated}.txt'
             np.savetxt(filename, X=list(global_best))
@@ -234,7 +239,7 @@ def run_exp(trial):
             filename = f'good_weights/mpsoga_12345678_{hof[0].gain}_{hof[0].defeated}.txt'
             np.savetxt(filename, X=list(hof[0]))
         stats.compile(ga_pop)
-        print(ga_g, stats)
+        log(f'GA g ,stats: {ga_g, stats}')
 
     # Play the best controller found
     env.enemies = [i for i in range(1, 9)]
