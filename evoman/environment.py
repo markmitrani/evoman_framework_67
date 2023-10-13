@@ -403,7 +403,7 @@ class Environment(object):
     # default fitness function for consolidating solutions among multiple games
 
     def cons_multi(self, values):
-        return values.mean()# - values.std()
+        return values.mean() - values.std()
 
     '''
     def cons_multi(self,values):

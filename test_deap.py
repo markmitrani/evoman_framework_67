@@ -224,7 +224,7 @@ def updateParticle(part, best, w, phi1, phi2):
     part[:] = (np.array(part)  + np.array(part.speed)).tolist()
 
 def run_pso_opt(trial):
-    ngen = 200
+    ngen = 5000
     population_size = 250
     min_value = -1#trial.suggest_float('MIN_VALUE', -1, 0)
     max_value = 1# trial.suggest_float('MAX_VALUE', 0, 1)
