@@ -18,8 +18,8 @@ smin_value = -0.5
 smax_value = 0.5
 
 # DEAP Params
-phi_1 = 0.146488346386721
-phi_2 = 2.446171779705618
+phi_1 = 0.7828674502864883
+phi_2 = 1.7686860023244022
 
 start_pop = []
 for filename in os.listdir('good_weights'):
