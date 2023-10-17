@@ -71,3 +71,13 @@ C = 0.2
 INDPB = 0.7
 CXPB = 0.5
 MUTPB = 0.7
+PHI_1 = 1.9275832140007672
+PHI_2 = 1.3673660004244517
+SMIN_VALUE = -0.5
+SMAX_VALUE = 0.5
+W = 1
+W_DEC = 0.0035
+SWARM_NUM = 5
+
+# Evoman constants
+headless = True
