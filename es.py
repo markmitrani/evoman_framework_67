@@ -9,6 +9,7 @@ from itertools import chain
 from deap import base, creator, tools, algorithms, cma
 
 from evoman.environment import Environment
+from ea import EA
 from deap_constants import *
 from deap_algorithms import *
 #from nn_controller import player_controller
@@ -33,87 +34,6 @@ def checkStrategy(minstrategy):
             return children
         return wrappper
     return decorator
-
-
-class EA:
-    def __init__(self, enemy, multimode=False, **kwargs):
-        self.enemy=enemy
-        self.env = None
-        self.toolbox = base.Toolbox()
-        self.generation = 0
-        self.kwargs=kwargs
-        self.init_DEAP()
-        self.init_logging()
-        multimode_str = 'yes' if multimode else 'no'
-        self.init_EVOMAN(multimode=multimode_str)
-
-    def init_logging(self):
-        self.hof = tools.HallOfFame(1)
-        self.stats = tools.Statistics(key=lambda ind: ind.fitness.values)
-        self.stats.register("avg", np.mean)
-        self.stats.register("std", np.std)
-        self.stats.register("min", np.min)
-        self.stats.register("max", np.max)
-
-    def evaluate(self, individual):
-        f,p,e,t,d = self.env.play(pcont=individual)
-        return (f, )
-
-    def get_gen(self):
-        return self.generation
-
-    def init_DEAP():
-        pass
-
-    def feasible(self, individual):
-        f, p, e, t,d = self.env.play(pcont=individual) 
-        return e == 0
-
-    def distance(self, individual):
-        f, p, e, t, d = self.env.play(pcont=individual)
-        return e
-
-    def init_EVOMAN(self, multimode):
-        if headless:
-            os.environ["SDL_VIDEODRIVER"] = "dummy"
-        experiment_name='cellular__es'
-        if not os.path.exists(experiment_name):
-            os.makedirs(experiment_name)
-        if type(self.enemy) == int:
-            self.enemy = [self.enemy]
-        self.env = Environment(experiment_name=experiment_name,
-                    enemies=self.enemy,
-                    multiplemode=multimode,
-                    playermode="ai",
-                    player_controller=player_controller(H_NODES_LAYERS[0]),
-                    enemymode="static",
-                    level=2,
-                    speed="fastest",
-                    visuals=False)
-        self.toolbox.register('evaluate', self.evaluate)
-        #self.toolbox.decorate("evaluate", tools.DeltaPenality(self.feasible, 5, self.distance))
-
-
-    def run_n(self):
-        for g in range(self.kwargs.get('NGEN', NGEN)):
-            record = self.run_cycle()
-            if g:
-                print(f'gen: {g}, record: {record}')
-            self.generation = g
-            yield record
-
-    def get_best(self):
-        return self.hof[0]
-
-    def run_cycle(self):
-        pass
-    def __repr__(self) -> str:
-        return 'EA'
-    def __str__(self):
-        return 'EA'
-
-    def extinction(self, percent=0.5):
-        self.pop = sorted(self.pop, reverse=True)[:len(self.pop)*percent]
 
 
 class CellularES(EA):
@@ -192,7 +112,7 @@ class CellularES(EA):
                     new_node_pop.append(offspring)
                     continue
 
-                offspring.fitness.values = self.toolbox.evaluate(offspring)
+                offspring.fitness.values = (self.toolbox.evaluate(offspring)[1], )
 
                 # Replacement
                 if offspring.fitness.values[0] >= ind.fitness.values[0]:
@@ -220,10 +140,11 @@ class ES(EA):
         super().__init__(enemy, multimode, **kwargs)
         population_size = self.kwargs.get('POPULATION_SIZE', POPULATION_SIZE)
         self.pop = self.toolbox.population(population_size)
+
         # Constants for Mutation / Crossover
         fitnesses = map(self.toolbox.evaluate, self.pop)
         for ind, fit in zip(self.pop, fitnesses):
-            ind.fitness.values = fit
+            ind.fitness.values = (fit[1], )
 
     def __repr__(self) -> str:
         return 'ES'
@@ -264,7 +185,7 @@ class ES(EA):
         invalid_ind = [ind for ind in offspring if not ind.fitness.valid]
         fitnesses = map(self.toolbox.evaluate, invalid_ind)
         for ind, fit in zip(invalid_ind, fitnesses):
-            ind.fitness.values = fit
+            ind.fitness.values = (fit[1], )
 
         # Replacement
         #self.pop[:] = offspring
@@ -310,7 +231,7 @@ class CMA(EA):
         pop = self.toolbox.generate()
         fitnesses = [self.toolbox.evaluate(individual=ind) for ind in pop]
         for ind, fit in zip(pop, fitnesses):
-            ind.fitness.values = fit
+            ind.fitness.values = (fit[1], )
         self.hof.update(pop)
         record = self.stats.compile(pop)
 
