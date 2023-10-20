@@ -138,8 +138,8 @@ class CellularES(EA):
 class ES(EA):
     def __init__(self, enemy, multimode=False, **kwargs):
         super().__init__(enemy, multimode, **kwargs)
-        population_size = self.kwargs.get('POPULATION_SIZE', POPULATION_SIZE)
-        self.pop = self.toolbox.population(population_size)
+        self.population_size = self.kwargs.get('POPULATION_SIZE', POPULATION_SIZE)
+        self.pop = self.toolbox.population(self.population_size)
 
         # Constants for Mutation / Crossover
         fitnesses = map(self.toolbox.evaluate, self.pop)
@@ -169,12 +169,13 @@ class ES(EA):
         self.toolbox.register('population', tools.initRepeat, list, self.toolbox.individual)
 
         self.toolbox.register("mate", tools.cxESTwoPoint)
-        self.toolbox.register('mutate', self_adaptive_correlated_mutation)
-        #toolbox.register("mutate", tools.mutESLogNormal, c=0.2, indpb=0.2)
-        self.toolbox.register("select", tools.selTournament, tournsize=tour_size)
+        #self.toolbox.register('mutate', tools.mutESLogNormal)
+        self.toolbox.register("mutate", tools.mutESLogNormal, c=C, indpb=INDPB)
+        self.toolbox.register("select", tools.selNSGA2)
+        #self.toolbox.register("select", tools.selTournament, tournsize=tour_size)
 
     def run_cycle(self):
-        parents = self.toolbox.select(self.pop, len(self.pop))
+        parents = self.toolbox.select(self.pop, 3*self.population_size)
         cxpb = self.kwargs.get('CXPB', CXPB)
         mutpb = self.kwargs.get('MUTPB', MUTPB)
 
@@ -189,7 +190,12 @@ class ES(EA):
 
         # Replacement
         #self.pop[:] = offspring
-        self.pop = self.toolbox.select(self.pop + offspring, len(self.pop))
+        possible_pop = self.pop+offspring
+
+        self.pop[:] = sorted(possible_pop, key=lambda x: x.fitness, reverse=True)[:self.population_size]
+
+        #self.pop = self.toolbox.select(self.pop + offspring, self.population_size)
+        #self.pop = self.toolbox.select(self.pop + offspring, len(self.pop))
 
         self.hof.update(self.pop)
         record = self.stats.compile(self.pop)

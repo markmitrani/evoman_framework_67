@@ -10,7 +10,7 @@ from demo_controller import player_controller
 from itertools import chain
 from deap import base, creator, tools, algorithms, cma
 
-ngen = 5000
+ngen = 500
 population_size = 550
 min_value = -1
 max_value = 1 
@@ -18,8 +18,6 @@ smin_value = -1
 smax_value = 1
 
 # DEAP Params
-phi_1 = 0.782867450286488
-phi_2 = 1.7686860023244
 
 '''
 start_pop = []
@@ -88,7 +86,6 @@ toolbox.register("particle", generate, size=265, pmin=min_value, \
                     pmax=max_value, smin=smin_value, smax=smax_value, gain=None, defeated=0, b_in_swarm=False)
 
 toolbox.register("population", tools.initRepeat, list, toolbox.particle)
-toolbox.register("update", updateParticle, phi1=phi_1, phi2=phi_2)
 
 enemies = [1, 2, 3, 4, 5, 6, 7, 8]
 env = Environment(experiment_name='cellular__es',
@@ -111,88 +108,79 @@ stats.register("max", np.max)
 best = None
 
 # Create a list to hold all the swarms
-swarms = []
-
-for _ in range(num_swarms):
-    # Create a swarm and initialize its particles
-    if False and _ == 0:
-        swarm = []
-        for vec in start_pop:
-            part = creator.Particle(vec)
-            part.speed = np.random.uniform(0, 0,size=265)
-            part.smin = -1 
-            part.smax = 1 
-            part.gain = 0
-            part.defeated = []
-            part.b_in_swarm = False
-            swarm.append(part)
-    else:
-        swarm = toolbox.population(n=particles_per_swarm)
-    swarms.append(swarm)
 
 # Define the global best particle (across all swarms)
 hof = tools.HallOfFame(1)
 
 # Set up parameters for Multi-Swarm PSO
-w = 1
-w_dec = 0.0015
 
+for i in range(10):
+    w = 1
+    phi_1 = np.random.uniform(0, 1) 
+    phi_2 = np.random.uniform(1, 3) 
+    toolbox.register("update", updateParticle, phi1=phi_1, phi2=phi_2)
+    swarms = []
 
-for g in range(ngen):
-    # Iterate through each swarm
-    global_best = None
-    local_bests = []
-    for swarm in swarms:
-        local_best = None
-        for part in swarm:
-            fitness, gain, defeated = toolbox.evaluate(individual=part)
-            part.gain = gain
-            part.defeated = defeated
-            part.fitness.values = (fitness,)
-
-            if not part.best or part.best.fitness < part.fitness:
-                part.best = creator.Particle(part)
-                part.best.defeated = part.defeated
-                part.best.gain = part.gain
-                part.best.fitness.values = part.fitness.values
-
-            if not local_best or local_best.fitness < part.fitness:
-                local_best = part
-
-        local_bests.append(local_best)
-        for part in swarm:
-            if part == local_best:
-                continue
-            toolbox.update(part, local_best, w)
-
-        if len(local_best.defeated) >= 7:
-            filename = f'good_weights/multi_pso_12345678_{global_best.gain}_{global_best.defeated}.txt'
-            np.savetxt(filename, X = local_best)
-            print(f'Saved weights to {filename}')
-
-        print(f'Swarm {swarms.index(swarm)}, Generation {g}: Best Fitness: {local_best.fitness}, Gain: {local_best.gain}, Defeated: {local_best.defeated}')
-
-    global_best = local_bests[max(range(len(local_bests)), key=lambda x: local_bests[x].fitness)]
-    for l_b in local_bests:
-        toolbox.update(l_b, global_best, w)
-
-    w -= w_dec
-
-    # Add communication between swarms by allowing some particles to migrate
-    if len(swarms) > 1:
-        for i, swarm in enumerate(swarms):
-            left_swarm = swarms[(i - 1) % len(swarms)]
-            right_swarm = swarms[(i + 1) % len(swarms)]
-
+    for _ in range(num_swarms):
+        # Create a swarm and initialize its particles
+        swarm = toolbox.population(n=particles_per_swarm)
+        swarms.append(swarm)
+    w_dec = 0.0015
+    for g in range(ngen):
+        # Iterate through each swarm
+        global_best = None
+        local_bests = []
+        for swarm in swarms:
+            local_best = None
             for part in swarm:
-                if np.random.rand() < 0.1:
-                    target_swarm = left_swarm if np.random.choice([True, False]) else right_swarm
-                    target_part = target_swarm[np.random.choice([i for i in range(len(target_swarm))])]
-                    part[:] = target_part[:]
-    
+                fitness, gain, defeated = toolbox.evaluate(individual=part)
+                part.gain = gain
+                part.defeated = defeated
+                part.fitness.values = (fitness,)
 
-    
-# Play the best controller found
-env.enemies = [i for i in range(1, 9)]
-f, p, e, t, defeated = env.play(pcont=global_best)
-print(f'f, gain, defeated: {f, p-e, defeated}')
+                if not part.best or part.best.fitness < part.fitness:
+                    part.best = creator.Particle(part)
+                    part.best.defeated = part.defeated
+                    part.best.gain = part.gain
+                    part.best.fitness.values = part.fitness.values
+
+                if not local_best or local_best.fitness < part.fitness:
+                    local_best = part
+
+            local_bests.append(local_best)
+            for part in swarm:
+                if part == local_best:
+                    continue
+                toolbox.update(part, local_best, w)
+
+            if len(local_best.defeated) >= 7:
+                filename = f'good_weights/multi_pso_12345678_{global_best.gain}_{global_best.defeated}.txt'
+                np.savetxt(filename, X = local_best)
+                print(f'Saved weights to {filename}')
+
+            print(f'Swarm {swarms.index(swarm)}, Generation {g}: Best Fitness: {local_best.fitness}, Gain: {local_best.gain}, Defeated: {local_best.defeated}')
+
+        global_best = local_bests[max(range(len(local_bests)), key=lambda x: local_bests[x].fitness)]
+        for l_b in local_bests:
+            toolbox.update(l_b, global_best, w)
+
+        w -= w_dec
+
+        # Add communication between swarms by allowing some particles to migrate
+        if len(swarms) > 1:
+            for i, swarm in enumerate(swarms):
+                left_swarm = swarms[(i - 1) % len(swarms)]
+                right_swarm = swarms[(i + 1) % len(swarms)]
+
+                for part in swarm:
+                    if np.random.rand() < 0.1:
+                        target_swarm = left_swarm if np.random.choice([True, False]) else right_swarm
+                        target_part = target_swarm[np.random.choice([i for i in range(len(target_swarm))])]
+                        part[:] = target_part[:]
+        
+
+        
+    # Play the best controller found
+    env.enemies = [i for i in range(1, 9)]
+    f, p, e, t, defeated = env.play(pcont=global_best)
+    print(f'f, gain, defeated: {f, p-e, defeated}')

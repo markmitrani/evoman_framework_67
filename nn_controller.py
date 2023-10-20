@@ -21,7 +21,7 @@ class player_controller(Controller):
         last_slice = 0
         self.weights = []
         self.bias = []
-        controller = np.array(controller)
+        #controller = np.array(controller)
         for layer_n in self.n_hidden:
             # Get slice representing layer_n biases for each node output
             self.bias.append(controller[last_slice:last_slice+layer_n].reshape(1, layer_n))

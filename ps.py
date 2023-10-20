@@ -1,5 +1,4 @@
 import os
-import copy
 from cProfile import Profile
 from pstats import SortKey, Stats
 import operator
@@ -10,23 +9,19 @@ from demo_controller import player_controller
 from itertools import chain
 from deap import base, creator, tools, algorithms, cma
 
-ngen = 5000
-population_size = 550
+ngen = 219
+population_size = 5000
 min_value = -1
 max_value = 1 
 smin_value = -0.5
 smax_value = 0.5
 
 # DEAP Params
-phi_1 = 0.7828674502864883
-phi_2 = 1.7686860023244022
-
-# Define the number of swarms and particles per swarm
-num_swarms = 5
-particles_per_swarm = population_size // num_swarms
+phi_1 = 1.9275832140007672
+phi_2 = 1.3673660004244517
 
 def generate(size, pmin, pmax, smin, smax, gain, defeated, b_in_swarm):
-    part = creator.Particle(np.random.uniform(pmin, pmax) for _ in range(size))
+    part = creator.Particle(np.random.uniform(pmin, pmax) for _ in range(size)) 
     part.speed = [np.random.uniform(smin, smax) for _ in range(size)]
     part.smin = smin
     part.smax = smax
@@ -39,24 +34,23 @@ def updateParticle(part, best, w, phi1, phi2):
     u1 = np.random.uniform(0, phi1, size=265)
     u2 = np.random.uniform(0, phi2, size=265)
     v_u1 = u1 * (np.array(part.best) - np.array(part))
+    #v_u1 = map(operator.mul, u1, map(operator.sub, part.best, part))
     v_u2 = u2 * (np.array(best) - np.array(part))
+    #v_u2 = map(operator.mul, u2, map(operator.sub, best, part))
     part.speed = (w * np.array(part.speed) + v_u1 + v_u2).tolist()
-    
-    # Update particle position
+    #part.speed = list(map(operator.add, part.speed, map(operator.add, v_u1, v_u2)))
     for i, speed in enumerate(part.speed):
-        if np.abs(speed) < part.smin:
+        if abs(speed) < part.smin:
             part.speed[i] = math.copysign(part.smin, speed)
-        elif np.abs(speed) > part.smax:
+        elif abs(speed) > part.smax:
             part.speed[i] = math.copysign(part.smax, speed)
-    
-    # Update particle position based on the updated speed
     part[:] = (np.array(part) + np.array(part.speed)).tolist()
 
 def evaluate(env, individual):
     #c = player_controller(H_NODES_LAYERS)
     #env.player_controller.set(individual, 20)
     f,p,e,t,d = env.play(pcont=individual)
-    return (p-e, p-e, d)
+    return (f, p-e, d)
 
 headless = True
 if headless:
@@ -92,31 +86,16 @@ stats.register("max", np.max)
 
 best = None
 
-
-
-# Create a list to hold all the swarms
-swarms = []
-for _ in range(num_swarms):
-    # Create a swarm and initialize its particles
-    swarm = toolbox.population(n=particles_per_swarm)
-    swarms.append(swarm)
-
-# Define the global best particle (across all swarms)
-global_best = None
-
-# Set up parameters for Multi-Swarm PSO
 w = 1.0
-w_dec = 0.0035
-
+w_dec = 0.0035 
 for g in range(ngen):
-    # Iterate through each swarm
-    for swarm in swarms:
-        local_best = None
-        for part in swarm:
+    with Profile() as profile:
+        for part in pop:
+
             fitness, gain, defeated = toolbox.evaluate(individual=part)
             part.gain = gain
             part.defeated = defeated
-            part.fitness.values = (fitness,)
+            part.fitness.values = (fitness, )
 
             if not part.best or part.best.fitness < part.fitness:
                 part.best = creator.Particle(part)
@@ -124,44 +103,34 @@ for g in range(ngen):
                 part.best.gain = part.gain
                 part.best.fitness.values = part.fitness.values
 
-            if not local_best or local_best.fitness < part.fitness:
-                local_best = creator.Particle(part)
-                local_best.gain = part.gain
-                local_best.defeated = part.defeated
-                local_best.fitness.values = part.fitness.values
+            if not best or best.fitness < part.fitness:
+                best = creator.Particle(part)
+                best.gain = part.gain
+                best.defeated = part.defeated
+                best.fitness.values = part.fitness.values
 
-            if not global_best or global_best.fitness < part.fitness:
-                global_best = creator.Particle(part)
-                global_best.gain = part.gain
-                global_best.defeated = part.defeated
-                global_best.fitness.values = part.fitness.values
-
-        for part in swarm:
-            toolbox.update(part, local_best, w)
+        for part in pop:
+            toolbox.update(part, best, w)
 
         w -= w_dec
+        
+        if len(best.defeated) >= 7:
+            np.savetxt(f'good_weights/pso_opt_12345678_{best.gain}_{best.defeated}.txt')
+        print(g, best.fitness, best.gain, best.defeated)
+        print(
+         Stats(profile)
+         .strip_dirs()
+         .sort_stats(SortKey.CALLS)
+         .print_stats()
+        )
 
-        if len(global_best.defeated) >= 7:
-            filename = f'good_weights/multi_pso_sum_12345678_{global_best.gain}_{global_best.defeated}.txt'
-            np.savetxt(filename)
-            print(f'Saved weights to {filename}')
+        # Gather all the fitnesses in one list and print the stats
+        #jap_1yRPEXhCQWprtAjMjSF2ut2skjJTPcE127884
 
-        print(f'Swarm {swarms.index(swarm)}, Generation {g}: Best Fitness: {global_best.fitness}, Gain: {global_best.gain}, Defeated: {global_best.defeated}')
-
-        # Add communication between swarms by allowing some particles to migrate
-        if len(swarms) > 1 and g % 20 == 0:
-            for i, swarm in enumerate(swarms):
-                left_swarm = swarms[(i - 1) % len(swarms)]
-                right_swarm = swarms[(i + 1) % len(swarms)]
-
-                for part in swarm:
-                    if np.random.rand() < 0.05:
-                        target_swarm = left_swarm if np.random.choice([True, False]) else right_swarm
-                        target_part = target_swarm[np.random.choice([i for i in range(len(target_swarm))])]
-                        part[:] = target_part[:]
-
-    
-# Play the best controller found
 env.enemies = [i for i in range(1, 9)]
-f, p, e, t, defeated = env.play(pcont=global_best)
+#es.env.update_parameter("speed", "normal")
+#es.env.update_parameter("visuals", True)
+#es.env.visuals = True
+#es.env.speed = "normal"
+f, p, e, t, defeated = env.play(pcont=best)
 print(f'f, gain, defeated: {f, p-e, defeated}')

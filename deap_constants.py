@@ -78,6 +78,7 @@ SMAX_VALUE = 0.5
 W = 1
 W_DEC = 0.0035
 SWARM_NUM = 5
+R = 20
 
 # Evoman constants
 headless = True

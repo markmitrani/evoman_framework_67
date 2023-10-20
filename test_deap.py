@@ -22,16 +22,14 @@ import optuna
 
 
 def run_es_opt(trial):
-    NGEN = trial.suggest_int('NGEN', 10, 150)
-    POPULATION_SIZE = trial.suggest_int('POPULATION_SIZE', 10, 150)
-    MIN_VALUE = trial.suggest_float('MIN_VALUE', -100, -0.1)
-    MAX_VALUE = trial.suggest_float('MAX_VALUE', 0.1, 100)
-    MIN_STRATEGY = trial.suggest_float('MIN_VALUE', -100, -0.1)
-    MAX_STRATEGY = trial.suggest_float('MAX_STRATEGY', 0.1, 100)
-    TOUR_SIZE = trial.suggest_int('TOUR_SIZE', 2, 20)
+    NGEN = 200
+    POPULATION_SIZE = 150
+    MIN_VALUE - 1
+    MAX_VALUE = 1
+    MIN_STRATEGY = 0.5
+    MAX_STRATEGY = 0.5
 
     # DEAP Params
-    ALPHA = trial.suggest_float('ALPHA', 0.1, 1.0)
     C = trial.suggest_float('C', 0.1, 1.0)
     INDPB = trial.suggest_float('INDPB', 0.1, 1.0)
     CXPB = trial.suggest_float('CXPB', 0.1, 1.0)
@@ -39,8 +37,8 @@ def run_es_opt(trial):
 
     es = ES([1, 2, 3, 4, 5, 6, 7, 8], True, NGEN=NGEN, POPULATION_SIZE=POPULATION_SIZE, \
             MIN_VALUES=MIN_VALUE, MAX_VALUE=MAX_VALUE, MIN_STRATEGY=MIN_STRATEGY, MAX_STRATEGY=MAX_STRATEGY,
-            TOUR_SIZE=TOUR_SIZE, ALPHA=ALPHA, C=C, INDPB=INDPB, CXPB=CXPB, MUTPB=MUTPB)
-    for record in  es.run_n():
+             C=C, INDPB=INDPB, CXPB=CXPB, MUTPB=MUTPB)
+    for record in  es.run_n(print_each_gen=True):
         pass
     es.env.enemies = [i for i in range(1, 9)]
     #es.env.update_parameter("speed", "normal")
@@ -90,7 +88,7 @@ def evaluate(env, individual):
     #c = player_controller(H_NODES_LAYERS)
     #env.player_controller.set(individual, 20)
     f,p,e,t,d = env.play(pcont=individual)
-    return (f, p-e, d)
+    return (p-e, p-e, d)
 
 def generateES(icls, scls, size, imin, imax, smin, smax):
     ind = icls(random.uniform(imin, imax) for _ in range(size))
@@ -161,6 +159,7 @@ def main_NSGAii():
             ind.fitness.values = fit
 
         # Replacement
+
         pop[:] = toolbox.select(pop + offspring, k=len(pop))
         #self.pop = self.toolbox.select(self.pop + offspring, len(self.pop))
 
@@ -221,19 +220,28 @@ def updateParticle(part, best, w, phi1, phi2):
             part.speed[i] = math.copysign(part.smin, speed)
         elif abs(speed) > part.smax:
             part.speed[i] = math.copysign(part.smax, speed)
-    part[:] = (np.array(part)  + np.array(part.speed)).tolist()
+    new_part = (np.array(part)  + np.array(part.speed)).tolist()
+    for i, v in enumerate(new_part):
+        if v > 1.0:
+            v = 1.0
+        if v < -1.0:
+            v = 1.0
+        new_part[i] = v
+    part[:] = new_part
 
 def run_pso_opt(trial):
-    ngen = 5000
-    population_size = 250
+    ngen = 300
+    population_size = 500
     min_value = -1#trial.suggest_float('MIN_VALUE', -1, 0)
     max_value = 1# trial.suggest_float('MAX_VALUE', 0, 1)
     smin_value = -1# trial.suggest_float('SMIN_VALUE', -1, 0)
     smax_value = 1 #trial.suggest_float('SMAX_VALUE', 0, 1)
+    w = 1# trial.suggest_float('W', 1, 3)
+    w_dec = 0.0035 # trial.suggest_float('W_DEC', 0.005, 0.05)
 
     # DEAP Params
-    phi_1 = trial.suggest_float('PHI_1', 0.0, 3)
-    phi_2 = trial.suggest_float('PHI_2', 0.0, 3)
+    phi_1 = trial.suggest_float('PHI_1', 0.0, 5)
+    phi_2 = trial.suggest_float('PHI_2', 0.0, 5)
 
     print('\n')
     print(min_value, max_value, smin_value, smax_value, phi_1, phi_2)
@@ -269,8 +277,6 @@ def run_pso_opt(trial):
 
     best = None
 
-    w = 1.0
-    w_dec = 0.0035 
     for g in range(ngen):
         for part in pop:
             fitness, gain, defeated = toolbox.evaluate(individual=part)
@@ -290,27 +296,27 @@ def run_pso_opt(trial):
         for part in pop:
             toolbox.update(part, best, w)
         w -= w_dec
-        if len(best.defeated) >= 6:
-            np.savetxt(f'good_weights/pso_opt_12345678_{best.gain}_{best.defeated}.txt', X=list(best))
+        if len(best.defeated) >= 7:
+            np.savetxt(f'good_weights/pso_opt_n_12345678_{best.gain}_{best.defeated}.txt', X=list(best))
         print(g, best.fitness, best.gain, best.defeated)
 
         # Gather all the fitnesses in one list and print the stats
         #jap_1yRPEXhCQWprtAjMjSF2ut2skjJTPcE127884
 
-    env.enemies = [i for i in range(1, 9)]
+    env.enemies = [1, 2, 3, 4, 5, 6, 7, 8]
     #es.env.update_parameter("speed", "normal")
     #es.env.update_parameter("visuals", True)
     #es.env.visuals = True
     #es.env.speed = "normal"
     f, p, e, t, defeated = env.play(pcont=best)
-    return len(defeated)
+    return p-e 
     #print(f'f, p, e, t, defeated: {es.env.play(pcont=es.get_best())}')
 
 def main_PSO():
     study = optuna.create_study(
         direction='maximize',
-        storage="sqlite:///pso_all_enemies_no_time",  # Specify the storage URL here.
-        study_name="pso_all_enemies_no_time",
+        storage="sqlite:///pso_not_4_enemies_no_time_n",  # Specify the storage URL here.
+        study_name="pso_not_4_enemies_no_time_n",
         load_if_exists=True
     )
     study.optimize(run_pso_opt, n_trials=100)
@@ -319,6 +325,7 @@ def main_PSO():
 #main_NSGAii()
 #main_CMA()
 #main()
-#main_es()
-main_PSO()
+main_es()
+#main_PSO()
+
 

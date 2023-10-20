@@ -11,10 +11,10 @@ from itertools import chain
 from deap import base, creator, tools, algorithms, cma
 
 
-pswarm_population = 250
+pswarm_population = 150
 pswarm_ngen = 20
-ga_population = 250
-ga_ngen = 200
+ga_population = 150
+ga_ngen = 1
 
 min_value = -1
 max_value = 1 
@@ -26,8 +26,8 @@ smax_value = 0.5
 # GA params
 
 def log(text):
-    with open('logger.txt', 'a') as f:
-        f.write(text)
+    with open('logger.txt', 'a+') as f:
+        f.write(text + '\n')
 
 
 def generate(size, pmin, pmax, smin, smax, gain, defeated, b_in_swarm, x=[]):
@@ -170,6 +170,7 @@ def pso_pop(pop, w, w_dec, num_swarms):
                 for part in swarm:
                     if np.random.rand() < 0.3:
                         part[:] = generate(265, min_value, max_value, smin_value, smax_value, None, 0, False)
+    return pop
 
 
 
@@ -181,13 +182,16 @@ def run_exp(trial):
     MUTPB = trial.suggest_float('MUTPB', 0, 1)
     CXPB = trial.suggest_float('CXPB', 0, 1)
     ALPHA = trial.suggest_float('ALPHA', 0, 1)
+    MU = trial.suggest_float('MU', 0, 1)
+    SIGMA = trial.suggest_float('SIGMA', 0, 1)
+    INDPB = trial.suggest_float('INDPB', 0, 1)
     #K = trial.suggest_int('K', 2, 40)
     W = trial.suggest_float('W', 0, 3) #1.0
     W_DEC = trial.suggest_float('W_DEC', 0.001, 0.01)
     NUM_SWARMS = trial.suggest_int('NUM_SWARSM', 1, 50)
 
     toolbox.register("mate", tools.cxBlend, alpha=ALPHA)
-    toolbox.register("mutate", tools.cxTwoPoint)
+    toolbox.register("mutate", tools.mutGaussian, mu=MU, sigma=SIGMA, indpb=INDPB)
     toolbox.register('select', tools.selNSGA2)
     toolbox.register("update", updateParticle, phi1=phi_1, phi2=phi_2)
 
@@ -203,10 +207,12 @@ def run_exp(trial):
         offspring = toolbox.select(ga_pop, len(ga_pop))
 
         # Apply PSO to offspring
-        offspring = pso_pop(offspring, W, W_DEC, NUM_SWARMS)
+        #offspring = pso_pop(offspring, W, W_DEC, NUM_SWARMS)
+
+        offspring = [toolbox.clone(ind) for ind in offspring]
 
         # Clone the selected individuals
-        offspring = map(toolbox.clone, offspring)
+        #offspring = map(toolbox.clone, offspring)
 
         # Apply crossover on the offspring
         for child1, child2 in zip(offspring[::2], offspring[1::2]):
@@ -222,18 +228,20 @@ def run_exp(trial):
                 del mutant.fitness.values
 
         # Evaluate the individuals with an invalid fitness
-        invalid_ind = [ind for ind in offspring if not ind.fitness.valid]
-        fitnesses = toolbox.map(toolbox.evaluate, invalid_ind)
-        for ind, fit in zip(invalid_ind, fitnesses):
-            fitness, gain, defeated = fit
-            ind.fitness.values = fitness
+        for ind in offspring:
+            if ind.fitness.valid:
+                continue
+            fitness, gain, defeated = toolbox.evaluate(env=env, individual=ind)
+            ind.fitness.values = (fitness, )
             ind.gain = gain
             ind.defeated = defeated
 
 
 
         # The population is entirely replaced by the offspring
-        ga_pop[:] = toolbox.select(offspring+ga_pop)
+        print(len(ga_pop[0]))
+        print(len(offspring[0]))
+        ga_pop[:] = toolbox.select(list(offspring)+list(ga_pop), len(ga_pop))
         hof.update(ga_pop)
         if len(hof[0].defeated) >= 7:
             filename = f'good_weights/mpsoga_12345678_{hof[0].gain}_{hof[0].defeated}.txt'

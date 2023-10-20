@@ -27,8 +27,12 @@ class EA:
         self.stats.register("max", np.max)
 
     def evaluate(self, individual):
-        f,p,e,t,d = self.env.play(pcont=individual)
+        X_np = np.array(individual)
+        X_std = np.divide(X_np - np.min(X_np),  np.max(X_np) - np.min(X_np))
+        X_scaled = 2 * X_std - 1
+        f,p,e,t,d = self.env.play(pcont=X_scaled.tolist())
         return (f, p-e,d )
+
 
     def get_gen(self):
         return self.generation
